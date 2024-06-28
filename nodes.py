@@ -62,7 +62,7 @@ class AuraSRUpscaler:
         try:
             self.upscaling_factor = int(self.config["image_size"] / self.config["input_image_size"])
         except:
-            print(f"Failed to calculate {model_name}'s upscaling factor. Defaulting to 4.")
+            print(f"[AuraSR-ComfyUI] Failed to calculate {model_name}'s upscaling factor. Defaulting to 4.")
             self.upscaling_factor = 4
         
         checkpoint = comfy.utils.load_torch_file(model_path, safe_load=True)
@@ -79,7 +79,7 @@ class AuraSRUpscaler:
         if model_management.directml_enabled and device == "default":
             device = "cpu"
             if not self.device_warned:
-                print("Cannot run AuraSR on DirectML device. Using CPU instead (this will be VERY SLOW!)")
+                print("[AuraSR-ComfyUI] Cannot run AuraSR on DirectML device. Using CPU instead (this will be VERY SLOW!)")
                 self.device_warned = True
         else:
             device = torch_device
@@ -88,7 +88,7 @@ class AuraSRUpscaler:
             self.unload()
             self.load(model_name, device)
             if self.config is None:
-                print("Could not find a config/ModelName .json file! Please download it from the model's HF page and place it inside '\models\Aura-SR'.\nReturning original image.")
+                print("[AuraSR-ComfyUI] Could not find a config/ModelName .json file! Please download it from the model's HF page and place it inside '\models\Aura-SR'. Returning original image.")
                 return (image, )
         else:
             self.aura_sr.upsampler.to(device)
@@ -98,14 +98,14 @@ class AuraSRUpscaler:
         try:
             upscaled_image = self.aura_sr.upscale_4x(image=image, max_batch_size=tile_batch_size)
         except:
-            print("Failed to upscale with AuraSR. Returning original image.")
+            print("[AuraSR-ComfyUI] Failed to upscale with AuraSR. Returning original image.")
             upscaled_image = image
         
         if reapply_transparency and resized_alpha is not None:
             try:
                 upscaled_image = paste_alpha(upscaled_image, resized_alpha)
             except:
-                print("Failed to apply alpha layer.")
+                print("[AuraSR-ComfyUI] Failed to apply alpha layer.")
         
         upscaled_image = pil2tensor(upscaled_image)
         
