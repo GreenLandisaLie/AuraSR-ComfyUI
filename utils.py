@@ -81,8 +81,7 @@ def paste_alpha(image, alpha):
 def prepare_input(image, transparency_mask, reapply_transparency, upscaling_factor):
     resized_alpha = get_resized_alpha(image, transparency_mask, upscaling_factor) if reapply_transparency else None
     image = to_pil(image)
-    if resized_alpha is not None:
-        image = image.convert("RGB")
+    image = image.convert("RGB")
     return image, resized_alpha
 
 
