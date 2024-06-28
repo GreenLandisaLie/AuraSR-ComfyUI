@@ -21,4 +21,3 @@ I'm not a dev (just self taught as an hobby) and have little to no experience wi
 
 TODO:
 - Add support for multiple image inputs
-- Add missing safety checks against invalid inputs
