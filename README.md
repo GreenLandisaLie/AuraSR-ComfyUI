@@ -3,6 +3,13 @@ Very basic ComfyUI implementation of [Aura-SR](https://github.com/fal-ai/aura-sr
 
 ![Interface](nodes_preview/pv1.png)
 
+
+ATTENTION:
+
+The upscaler is ultra sensitive to ANY kind of image compression and when given such image the output will probably be terrible. It is highly recommended that you feed it images straight out of SD (prior to any saving) - unlike the example above - which shows some of the common artifacts introduced on compressed images.
+
+
+
 Instructions:
 - Create a folder named 'Aura-SR' inside '\models'.
 - Download the .safetensors AND config.json files from [HuggingFace](https://huggingface.co/fal/AuraSR/tree/main) and place them in '\models\Aura-SR'
