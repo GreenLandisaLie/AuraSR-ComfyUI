@@ -13,8 +13,6 @@ folder_paths.folder_names_and_paths["aura-sr"] = ([os.path.join(folder_paths.mod
 class AuraSRUpscaler:
     @classmethod
     def INPUT_TYPES(s):
-        input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
         return {"required": {"model_name": (folder_paths.get_filename_list("aura-sr"),),
                              "image": ("IMAGE",),
                              "reapply_transparency": ("BOOLEAN", {"default": True}),
