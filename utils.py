@@ -40,13 +40,18 @@ def has_transparency(image):
         
     return False
 
+def copy_image(image):
+    if isinstance(image, torch.Tensor):
+        return image.clone().detach()
+    return image.copy() # works for both numpy and pil
+
 def get_resized_alpha(image, transparency_mask, upscaling_factor):
     try:
         if transparency_mask is not None:
             if image.shape[:3] != transparency_mask.shape[:3] and len(transparency_mask.shape) != len(image.shape) + 1:
                 # Invalid mask. Attempt with original image
                 if has_transparency(image):
-                    img = image
+                    img = copy_image(image)
                 else:
                     return None
             else:
@@ -55,12 +60,12 @@ def get_resized_alpha(image, transparency_mask, upscaling_factor):
                 img = img.reshape((-1, 1, img.shape[-2], img.shape[-1])).movedim(1, -1).expand(-1, -1, -1, 3) # mask -> image
         else:
             if has_transparency(image):
-                img = image
+                img = copy_image(image)
             else:
                 return None
         
         if isinstance(img, torch.Tensor):
-            img = img.clone().cpu().numpy()
+            img = img.cpu().numpy()
         if isinstance(img, np.ndarray):
             mode = 'RGBA' if transparency_mask is None else 'RGB'
             img = Image.fromarray(np.clip(255. * img.squeeze(0), 0, 255).astype(np.uint8), mode=mode)
@@ -80,10 +85,6 @@ def paste_alpha(image, alpha):
 
 def prepare_input(image, transparency_mask, reapply_transparency, upscaling_factor):
     resized_alpha = get_resized_alpha(image, transparency_mask, upscaling_factor) if reapply_transparency else None
-    image = to_pil(image)
-    image = image.convert("RGB")
+    image = to_pil(image).convert("RGB")
     return image, resized_alpha
 
-
-
- 
