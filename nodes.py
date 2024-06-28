@@ -36,6 +36,7 @@ class AuraSRUpscaler:
         self.aura_sr = None
         self.upscaling_factor = 4
         self.device_warned = False
+        self.config = None
     
     
     def unload(self):
@@ -45,6 +46,7 @@ class AuraSRUpscaler:
         self.loaded = False
         self.model_name = ""
         self.upscaling_factor = 4
+        self.config = None
     
     
     def load(self, model_name, device):
@@ -52,17 +54,20 @@ class AuraSRUpscaler:
         config_path = model_path[:model_path.rindex('.')] + ".json"
         config_path = config_path if os.path.isfile(config_path) else model_path.replace(model_name, "config.json")
         
-        config = json.loads(Path(config_path).read_text())
+        if os.path.isfile(config_path):
+            self.config = json.loads(Path(config_path).read_text())
+        else:
+            return
         
         try:
-            self.upscaling_factor = int(config["image_size"] / config["input_image_size"])
+            self.upscaling_factor = int(self.config["image_size"] / self.config["input_image_size"])
         except:
             print(f"Failed to calculate {model_name}'s upscaling factor. Defaulting to 4.")
             self.upscaling_factor = 4
         
         checkpoint = comfy.utils.load_torch_file(model_path, safe_load=True)
         
-        self.aura_sr = AuraSR(config=config, device=device)
+        self.aura_sr = AuraSR(config=self.config, device=device)
         self.aura_sr.upsampler.load_state_dict(checkpoint, strict=True)
         
         self.loaded = True
@@ -82,6 +87,9 @@ class AuraSRUpscaler:
         if not self.loaded or self.model_name != model_name:
             self.unload()
             self.load(model_name, device)
+            if self.config is None:
+                print("Could not find a config/ModelName .json file! Please download it from the model's HF page and place it inside '\models\Aura-SR'.\nReturning original image.")
+                return (image, )
         else:
             self.aura_sr.upsampler.to(device)
         
