@@ -10,6 +10,21 @@ from .utils import *
 
 folder_paths.folder_names_and_paths["aura-sr"] = ([os.path.join(folder_paths.models_dir, "aura-sr")], folder_paths.supported_pt_extensions)
 
+AuraSRUpscalers = []
+
+def getAuraClassFromMemory(model_name):
+    i = 0
+    while (i < len(AuraSRUpscalers)):
+        if model_name == AuraSRUpscalers[i].model_name:
+            if not AuraSRUpscalers[i].loaded: # remove if model not loaded
+                AuraSRUpscalers[i].unload()
+                AuraSRUpscalers.pop(i)
+            else:
+                return AuraSRUpscalers[i]
+        i += 1
+    return None
+
+
 class AuraSRUpscaler:
     @classmethod
     def INPUT_TYPES(s):
@@ -37,6 +52,7 @@ class AuraSRUpscaler:
         self.upscaling_factor = 4
         self.device_warned = False
         self.config = None
+        self.device = "cpu"
     
     
     def unload(self):
@@ -47,6 +63,7 @@ class AuraSRUpscaler:
         self.model_name = ""
         self.upscaling_factor = 4
         self.config = None
+        self.device = "cpu"
     
     
     def load(self, model_name, device):
@@ -72,45 +89,83 @@ class AuraSRUpscaler:
         
         self.loaded = True
         self.model_name = model_name
+        self.device = device
+    
+    
+    def load_from_memory(self, cl, device):
+        self.loaded = True
+        self.model_name = cl.model_name
+        self.aura_sr = cl.aura_sr
+        self.upscaling_factor = cl.upscaling_factor
+        self.device_warned = cl.device_warned
+        self.config = cl.config
+        if device != cl.device:
+            self.aura_sr.upsampler.to(device)
+            cl.device = device
+        self.device = device
+    
     
     
     def main(self, model_name, image, reapply_transparency, tile_batch_size, device, offload_to_cpu, transparency_mask=None):
+        
+        # set device
         torch_device = model_management.get_torch_device()
-        if model_management.directml_enabled and device == "default":
+        if model_management.directml_enabled:
             device = "cpu"
-            if not self.device_warned:
+            if device == "default" and not self.device_warned:
                 print("[AuraSR-ComfyUI] Cannot run AuraSR on DirectML device. Using CPU instead (this will be VERY SLOW!)")
                 self.device_warned = True
         else:
-            device = torch_device
+            device = torch_device if device == "default" else "cpu"
+            device = device if str(device).lower() != "cpu" else "cpu" # force device to be "cpu" when using CPU in default mode
         
+        # load/unload model
+        class_in_memory = getAuraClassFromMemory(model_name)
         if not self.loaded or self.model_name != model_name:
-            self.unload()
-            self.load(model_name, device)
+            
+            if class_in_memory is None:
+                self.unload()
+                self.load(model_name, device)
+                AuraSRUpscalers.append(self)
+            else:
+                self.load_from_memory(class_in_memory, device)
+            
             if self.config is None:
-                print("[AuraSR-ComfyUI] Could not find a config/ModelName .json file! Please download it from the model's HF page and place it inside '\models\Aura-SR'. Returning original image.")
+                print("[AuraSR-ComfyUI] Could not find a config/ModelName .json file! Please download it from the model's HF page and place it inside '\models\Aura-SR'.\nReturning original image.")
                 return (image, )
         else:
-            self.aura_sr.upsampler.to(device)
+            if self.device != device:
+                self.aura_sr.upsampler.to(device)
+                self.device = device
+                if class_in_memory is not None:
+                    class_in_memory.device = device
         
-        image, resized_alpha = prepare_input(image, transparency_mask, reapply_transparency, self.upscaling_factor)        
+        # prepare input image and resized_alpha
+        image, resized_alpha = prepare_input(image, transparency_mask, reapply_transparency, self.upscaling_factor)
         
+        # upscale
         try:
             upscaled_image = self.aura_sr.upscale_4x(image=image, max_batch_size=tile_batch_size)
         except:
             print("[AuraSR-ComfyUI] Failed to upscale with AuraSR. Returning original image.")
             upscaled_image = image
         
+        # apply resized_alpha
         if reapply_transparency and resized_alpha is not None:
             try:
                 upscaled_image = paste_alpha(upscaled_image, resized_alpha)
             except:
                 print("[AuraSR-ComfyUI] Failed to apply alpha layer.")
         
+        # back to tensor
         upscaled_image = pil2tensor(upscaled_image)
         
+        # offload to cpu
         if offload_to_cpu:
             self.aura_sr.upsampler.to("cpu")
+            self.device = "cpu"
+            if class_in_memory is not None:
+                class_in_memory.device = "cpu"
         
         return (upscaled_image, )
 
