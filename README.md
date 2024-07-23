@@ -16,7 +16,7 @@ Example workflow with DeJPG:
 
 # Update v2.1.0:
 - Added support for AuraSR v0.4.0
-	- Which introduces 2 new upscaling methods: '4x_overlapped_checkboard' and '4x_overlapped_constant'.
+	- Which introduces 2 new upscaling methods: '4x_overlapped_checkboard' and '4x_overlapped_constant'. [Comparison](https://imgsli.com/MjgxMzgx)
 	- These new methods take at least twice the amount of time as the original but may offer better results.
 
 # Instructions:
