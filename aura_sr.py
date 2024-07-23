@@ -14,6 +14,8 @@ import torch.nn.functional as F
 
 from einops import rearrange, repeat, reduce
 from einops.layers.torch import Rearrange
+from torchvision.utils import save_image
+import math
 
 
 def get_same_padding(size, kernel, dilation, stride):
@@ -718,6 +720,31 @@ def tile_image(image, chunk_size=64):
             tiles.append(tile)
     return tiles, h_chunks, w_chunks
 
+# This helps create a checkboard pattern with some edge blending
+def create_checkerboard_weights(tile_size):
+    x = torch.linspace(-1, 1, tile_size)
+    y = torch.linspace(-1, 1, tile_size)
+
+    x, y = torch.meshgrid(x, y, indexing='ij')
+    d = torch.sqrt(x*x + y*y)
+    sigma, mu = 0.5, 0.0
+    weights = torch.exp(-((d-mu)**2 / (2.0 * sigma**2)))
+
+    # saturate the values to sure get high weights in the center
+    weights = weights**8
+
+    return weights / weights.max()  # Normalize to [0, 1]
+
+def repeat_weights(weights, image_size):
+    tile_size = weights.shape[0]
+    repeats = (math.ceil(image_size[0] / tile_size), math.ceil(image_size[1] / tile_size))
+    return weights.repeat(repeats)[:image_size[0], :image_size[1]]
+
+def create_offset_weights(weights, image_size):
+    tile_size = weights.shape[0]
+    offset = tile_size // 2
+    full_weights = repeat_weights(weights, (image_size[0] + offset, image_size[1] + offset))
+    return full_weights[offset:, offset:]
 
 def merge_tiles(tiles, h_chunks, w_chunks, chunk_size=64):
     # Determine the shape of the output tensor
@@ -740,7 +767,6 @@ def merge_tiles(tiles, h_chunks, w_chunks, chunk_size=64):
         merged[:, h_start:h_start+tile_h, w_start:w_start+tile_w] = tile
 
     return merged
-
 
 class AuraSR:
     def __init__(self, config: dict[str, Any], device: str = "cuda"):
@@ -832,3 +858,98 @@ class AuraSR:
         to_pil = transforms.ToPILImage()
         return to_pil(unpadded)
 
+    # Tiled 4x upscaling with overlapping tiles to reduce seam artifacts
+    # weights options are 'checkboard' and 'constant'
+    @torch.no_grad()
+    def upscale_4x_overlapped(self, image, max_batch_size=8, weight_type='checkboard'):
+        tensor_transform = transforms.ToTensor()
+        device = self.upsampler.device
+
+        image_tensor = tensor_transform(image).unsqueeze(0)
+        _, _, h, w = image_tensor.shape
+
+        # Calculate paddings
+        pad_h = (
+            self.input_image_size - h % self.input_image_size
+        ) % self.input_image_size
+        pad_w = (
+            self.input_image_size - w % self.input_image_size
+        ) % self.input_image_size
+
+        # Pad the image
+        image_tensor = torch.nn.functional.pad(
+            image_tensor, (0, pad_w, 0, pad_h), mode="reflect"
+        ).squeeze(0)
+
+        # Function to process tiles
+        def process_tiles(tiles, h_chunks, w_chunks):
+            num_tiles = len(tiles)
+            batches = [
+                tiles[i : i + max_batch_size]
+                for i in range(0, num_tiles, max_batch_size)
+            ]
+            reconstructed_tiles = []
+
+            for batch in batches:
+                model_input = torch.stack(batch).to(device)
+                generator_output = self.upsampler(
+                    lowres_image=model_input,
+                    noise=torch.randn(model_input.shape[0], 128, device=device),
+                )
+                reconstructed_tiles.extend(
+                    list(generator_output.clamp_(0, 1).detach().cpu())
+                )
+
+            return merge_tiles(
+                reconstructed_tiles, h_chunks, w_chunks, self.input_image_size * 4
+            )
+
+        # First pass
+        tiles1, h_chunks1, w_chunks1 = tile_image(image_tensor, self.input_image_size)
+        result1 = process_tiles(tiles1, h_chunks1, w_chunks1)
+
+        # Second pass with offset
+        offset = self.input_image_size // 2
+        image_tensor_offset = torch.nn.functional.pad(image_tensor, (offset, offset, offset, offset), mode='reflect').squeeze(0)        
+
+        tiles2, h_chunks2, w_chunks2 = tile_image(
+            image_tensor_offset, self.input_image_size
+        )
+        result2 = process_tiles(tiles2, h_chunks2, w_chunks2)
+
+        # unpad 
+        offset_4x = offset * 4
+        result2_interior = result2[:, offset_4x:-offset_4x, offset_4x:-offset_4x]
+
+        if weight_type == 'checkboard':
+            weight_tile = create_checkerboard_weights(self.input_image_size * 4)
+            
+            weight_shape = result2_interior.shape[1:]
+            weights_1 = create_offset_weights(weight_tile, weight_shape)
+            weights_2 = repeat_weights(weight_tile, weight_shape)
+            
+            normalizer = weights_1 + weights_2
+            weights_1 = weights_1 / normalizer
+            weights_2 = weights_2 / normalizer
+
+            weights_1 = weights_1.unsqueeze(0).repeat(3, 1, 1)
+            weights_2 = weights_2.unsqueeze(0).repeat(3, 1, 1)
+        elif weight_type == 'constant':
+            weights_1 = torch.ones_like(result2_interior) * 0.5
+            weights_2 = weights_1
+        else:
+            raise ValueError("weight_type should be either 'gaussian' or 'constant' but got", weight_type)
+        
+        result1 = result1 * weights_2
+        result2 = result2_interior * weights_1
+
+        # Average the overlapping region
+        result1 = (
+            result1 + result2
+        )
+
+        # Remove padding
+        unpadded = result1[:, : h * 4, : w * 4]
+
+        to_pil = transforms.ToPILImage()
+        return to_pil(unpadded)

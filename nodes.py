@@ -60,6 +60,7 @@ class AuraSRUpscaler:
     def INPUT_TYPES(s):
         return {"required": {"model_name": (folder_paths.get_filename_list("aura-sr"),),
                              "image": ("IMAGE",),
+                             "mode": (["4x", "4x_overlapped_checkboard", "4x_overlapped_constant"],),
                              "reapply_transparency": ("BOOLEAN", {"default": True}),
                              "tile_batch_size": ("INT", {"default": 8, "min": 1, "max": 32}),
                              "device": (["default", "cpu"],),
@@ -132,7 +133,7 @@ class AuraSRUpscaler:
     
     
     
-    def main(self, model_name, image, reapply_transparency, tile_batch_size, device, offload_to_cpu, transparency_mask=None):
+    def main(self, model_name, image, mode, reapply_transparency, tile_batch_size, device, offload_to_cpu, transparency_mask=None):
         
         # set device
         torch_device = model_management.get_torch_device()
@@ -172,7 +173,12 @@ class AuraSRUpscaler:
         # upscale
         inference_failed = False
         try:
-            upscaled_image = self.aura_sr.upscale_4x(image=image, max_batch_size=tile_batch_size)
+            if mode == "4x":
+                upscaled_image = self.aura_sr.upscale_4x(image=image, max_batch_size=tile_batch_size)
+            elif mode == "4x_overlapped_checkboard":
+                upscaled_image = self.aura_sr.upscale_4x_overlapped(image=image, max_batch_size=tile_batch_size, weight_type='checkboard')
+            else:
+                upscaled_image = self.aura_sr.upscale_4x_overlapped(image=image, max_batch_size=tile_batch_size, weight_type='constant') 
         except:
             inference_failed = True
             print("[AuraSR-ComfyUI] Failed to upscale with AuraSR. Returning original image.")
