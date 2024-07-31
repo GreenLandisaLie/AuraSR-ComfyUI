@@ -2,7 +2,7 @@
 name = "aurasr-comfyui"
 description = "ComfyUI implementation of AuraSR"
 version = "2.1.2"
-license = "LICENSE"
+license = { file = "LICENSE.md" }
 
 [project.urls]
 Repository = "https://github.com/GreenLandisaLie/AuraSR-ComfyUI"
