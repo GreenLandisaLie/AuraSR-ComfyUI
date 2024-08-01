@@ -7,10 +7,10 @@ def pil2tensor(image):
     return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
 
 def tensor2pil(image):
-    return Image.fromarray(np.clip(255. * image.cpu().numpy().squeeze(0), 0, 255).astype(np.uint8))
+    return Image.fromarray(np.clip(255. * image.cpu().numpy().squeeze(), 0, 255).astype(np.uint8))
 
 def numpy2pil(image):
-    return Image.fromarray(np.clip(255. * image.squeeze(0), 0, 255).astype(np.uint8))
+    return Image.fromarray(np.clip(255. * image.squeeze(), 0, 255).astype(np.uint8))
 
 def to_pil(image):
     if isinstance(image, Image.Image):
@@ -68,7 +68,7 @@ def get_resized_alpha(image, transparency_mask, upscaling_factor):
             img = img.cpu().numpy()
         if isinstance(img, np.ndarray):
             mode = 'RGBA' if transparency_mask is None else 'RGB'
-            img = Image.fromarray(np.clip(255. * img.squeeze(0), 0, 255).astype(np.uint8), mode=mode)
+            img = Image.fromarray(np.clip(255. * img.squeeze(), 0, 255).astype(np.uint8), mode=mode)
             if not img.getbbox(): # some RGB images return fully black masks with the 'Load Image' node - cannot apply masking if so
                 return None
         
