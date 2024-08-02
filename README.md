@@ -29,7 +29,7 @@ Example workflow with DeJPG:
 - Add Node > AuraSR > AuraSR Upscaler
 - All of the node's parameters are self explanatory apart for 'transparency_mask' and 'reapply_transparency':
   - transparency_mask: (Optional) A mask obtained from loading a RGBA image (with transparent pixels). Can be directly connected to the 'Load Image' native node.
-  - reapply_transparency: When given a valid mask AND/OR a single RGBA image - it will attempt to reapply the transparency of the original image to the upscaled one. Keep in mind that the 'Load Image' native node auto-converts the input image to RGB (no transparency) before sending it to another node. Therefore if you are not passing a valid 'transparency_mask' then you need a specialized node capable of loading and outputing in RGBA mode. This mode is internally disabled whenever you send a batch of images to the node.
+  - reapply_transparency: When given a valid mask AND/OR a single RGBA image - it will attempt to reapply the transparency of the original image to the upscaled one. Keep in mind that the 'Load Image' native node auto-converts the input image to RGB (no transparency) before sending it to another node. Therefore if you are not passing a valid 'transparency_mask' then you need a specialized node capable of loading and outputing in RGBA mode. This feature is internally disabled whenever you send a batch of images to the node.
 
 
 
