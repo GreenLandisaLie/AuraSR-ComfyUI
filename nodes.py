@@ -40,8 +40,8 @@ def get_config(model_path):
             if rule == 1 and c.parent == Path(model_path).parent and c.stem.lower() == "config":
                 return json.loads(c.read_text())
             if rule == 2 and str(c.parent) == aurasr_fullpath and c.stem.lower() == "config":
-                print(f"\n[AuraSR-ComfyUI] WARNING:\n\tCould not find a config named 'config.json'/modelname.json for model: '\{c.parent.name}\{Path(model_path).parent.name}\{Path(model_path).name}'")
-                print(f"\tUsing '\{c.parent.name}\{c.name}' instead.")
+                print(f"\n[AuraSR-ComfyUI] WARNING:\n\tCould not find a config named 'config.json'/modelname.json for model: '\\{c.parent.name}\\{Path(model_path).parent.name}\\{Path(model_path).name}'")
+                print(f"\tUsing '\\{c.parent.name}\\{c.name}' instead.")
                 print("\tIf this configuration is not intended for this model then it can cause errors or quality loss in the output!!\n")
                 return json.loads(c.read_text())
         rule += 1
