@@ -67,6 +67,7 @@ class AuraSRUpscaler:
     
     
     def load(self, model_name, device):
+        print(f"SLOW! LOADING AURA MODEL: {model_name}")
         model_path = folder_paths.get_full_path("aura-sr", model_name)
         config_path = model_path[:model_path.rindex('.')] + ".json"
         config_path = config_path if os.path.isfile(config_path) else model_path.replace(model_name, "config.json")
@@ -107,7 +108,6 @@ class AuraSRUpscaler:
     
     
     def main(self, model_name, image, reapply_transparency, tile_batch_size, device, offload_to_cpu, transparency_mask=None):
-        
         # set device
         torch_device = model_management.get_torch_device()
         if model_management.directml_enabled:
