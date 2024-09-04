@@ -1,7 +1,7 @@
 [project]
 name = "aurasr-comfyui"
 description = "ComfyUI implementation of AuraSR"
-version = "3.0.0"
+version = "3.0.1"
 license = { file = "LICENSE.md" }
 
 [project.urls]
